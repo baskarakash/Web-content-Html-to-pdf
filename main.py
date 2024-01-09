@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Form
+from fastapi import FastAPI, HTTPException, Form,Request
 from fastapi.responses import HTMLResponse
-import requests
+from fastapi.templating import Jinja2Templates
 import pdfkit
 
 app = FastAPI()
@@ -8,30 +8,18 @@ app = FastAPI()
 # Specify the path to wkhtmltopdf executable
 config = pdfkit.configuration(wkhtmltopdf=r'C:\Users\AkashBaskar\Desktop\html2pdf\wkhtmltox\bin\wkhtmltopdf.exe')
 
+# Configure Jinja2 templates
+templates = Jinja2Templates(directory="templates")
+
 @app.get("/")
-async def main():
-    html_content = """
-    <html>
-        <body>
-            <form method="post" action="/generate_pdf">
-                <label for="url">Enter URL:</label>
-                <input type="text" name="url" id="url" required>
-                <button type="submit">Generate PDF</button>
-            </form>
-        </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content, status_code=200)
+async def main(request: Request):
+    return templates.TemplateResponse("main.html", {"request": request})
 
 @app.post("/generate_pdf")
-async def generate_pdf(url: str = Form(...)):
+async def generate_pdf(html_content: str = Form(...)):
     try:
-        # Fetch HTML content from the URL
-        response = requests.get(url)
-        response.raise_for_status()
-
         # Convert HTML to PDF using specified wkhtmltopdf executable
-        pdf_content = pdfkit.from_url(url, False, configuration=config)
+        pdf_content = pdfkit.from_string(html_content, False, configuration=config)
 
         # Save the PDF to a file
         pdf_filename = "output.pdf"
@@ -40,7 +28,5 @@ async def generate_pdf(url: str = Form(...)):
 
         return {"message": "PDF generated successfully", "pdf_filename": pdf_filename}
 
-    except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch URL: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
